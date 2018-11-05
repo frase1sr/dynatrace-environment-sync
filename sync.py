@@ -4,22 +4,24 @@ import requests
 import json
 
 masterEnv = "https://example.live.dynatrace.com/api/config/v1/"
-masterEnvToken = "23413441234"
+masterEnvToken = "123412341234"
+
 
 syncEnvList = [
-    {"URL" :"https://example.live.dynatrace.com/api/config/v1/","token":"23413441234"},
-    {"URL" :"https://example.dynatrace-managed.com/e/d3cc8e25-2968-45b4-896f-754f3e26b4a8/api/config/v1/","token":"23413441234"},
-    {"URL" :"https://example.dynatrace-managed.com/e/2318471f-e9f3-4d14-8c61-6cf4e5bd48f6/api/config/v1/","token":"23413441234"},
-    {"URL" :"https://example.dynatrace-managed.com/e/293d4569-1cd7-4875-b9a1-3b380d2dc41e/api/config/v1/","token":"23413441234"},
+    {"URL" :"https://example.live.dynatrace.com/api/config/v1/","token":"RNjiKz3PSoWItWGz9MBp7"},
+    {"URL" :"https://example.dynatrace-managed.com/e/d3cc8e25-2968-45b4-896f-754f3e26b4a8/api/config/v1/","token":"12341234123"},
+    {"URL" :"https://example.dynatrace-managed.com/e/2318471f-e9f3-4d14-8c61-6cf4e5bd48f6/api/config/v1/","token":"12341234123441"},
+    {"URL" :"https://example.dynatrace-managed.com/e/293d4569-1cd7-4875-b9a1-3b380d2dc41e/api/config/v1/","token":"12341421341"}
 ]
 
 
-requestAttributesEnabled = True   
+requestAttributesEnabled = True
 autoTaggingRulesEnabled = False
 managementZonesRulesEnabled = False
+# customServicesEnabled = False
 
 addNotExisting = True
-updateExisting = False
+updateExisting = True
 
 
 
@@ -72,14 +74,14 @@ def createItem(env,token,endPoint,item):
 def updateItem(env,token,endPoint,item):
     makeRequestWithPayload(env+endPoint+"/"+item['id'],token,"PUT",item)
 
-def syncRules(endPoint, add, update,syncEnv,syncEnvToken):
-    allMasterConfig = getAllCongRules(masterEnv,masterEnvToken,endPoint)['values']
-    allSync = getAllCongRules(syncEnv,syncEnvToken,endPoint)['values']
+def syncRules(endPoint, add, update,syncEnv,syncEnvToken, accessObj):
+    allMasterConfig = getAllCongRules(masterEnv,masterEnvToken,endPoint)[accessObj]
+    allSync = getAllCongRules(syncEnv,syncEnvToken,endPoint)[accessObj]
     if add:
         diff = compare(allMasterConfig,allSync)
         for item in diff:
             details = getDetails(masterEnv,masterEnvToken,endPoint,item)
-            details['id'] = None
+            del details['id']
             createItem(syncEnv,syncEnvToken, endPoint,details)
     if update:
         for item in allMasterConfig:
@@ -94,10 +96,12 @@ def syncEnviroments():
     for item in syncEnvList:
         print(item["URL"])
         if requestAttributesEnabled:
-            syncRules("requestAttributes",addNotExisting,updateExisting,item["URL"],item["token"])
+            syncRules("requestAttributes",addNotExisting,updateExisting,item["URL"],item["token"],"values")
         if autoTaggingRulesEnabled:
-            syncRules("autoTags",addNotExisting,updateExisting,item["URL"],item["token"])
+            syncRules("autoTags",addNotExisting,updateExisting,item["URL"],item["token"],"values")
         if managementZonesRulesEnabled:
-            syncRules("managementZones",addNotExisting,updateExisting,item["URL"],item["token"])
+            syncRules("managementZones",addNotExisting,updateExisting,item["URL"],item["token"],"values")
+        # if customServicesEnabled:
+        #     syncRules("customServices/java",addNotExisting,updateExisting,item["URL"],item["token"],"customServices")
 
 syncEnviroments()
