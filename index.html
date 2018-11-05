@@ -1,0 +1,391 @@
+<!<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Sync Dynatrace Environments</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <!-- jQuery library -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!-- Latest compiled JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <!-- Angular JS-->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+
+</head>
+
+<body>
+    <div class="container" ng-app="app" ng-controller="mainCtlr">
+        <div class="panel panel-info">
+            <div class="panel panel-heading">
+                <h1>Information</h1>
+            </div>
+            <div class="panel panel-body">
+            </div>
+        </div>
+        <div class="panel panel-primary">
+            <form name="entryForm">
+                <div class="panel panel-heading">
+                    <h1>Dynatrace Environment</h1>
+                </div>
+                <div class="panel panel-body">
+
+                    <div class="form-group">
+                        <label>
+                            Dynatrace Master Environment URL
+                        </label>
+                        <div class="alert alert-danger" ng-if='!entryForm.masterEnvURL.$valid && hasSubmitted' ng-cloak>
+                            <div ng-message="required">Master Environment base url is required</div>
+                        </div>
+                        <input ng-disabled="isbtnRunDisabled()" name="masterEnvURL" ng-model="masterEnv.url" placeholder="https://example.live.dynatrace.com" type="text" class="form-control"
+                            required></input>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            Master Token
+                        </label>
+                        <div class="alert alert-danger" ng-if='!entryForm.masterEnvToken.$valid  && hasSubmitted' ng-cloak>
+                            <div ng-message="required">Master Environment token is required</div>
+                        </div>
+                        <input ng-disabled="isbtnRunDisabled()" name="masterEnvToken" ng-model="masterEnv.token" placeholder="123-45678910111zwbwq" type="text" class="form-control"
+                            id="masterToken" required></input>
+                    </div>
+                    <div class="panel panel-default">
+                        <div class="panel-heading">Environments to sync</div>
+                        <div class="panel-body">
+                            <div ng-repeat="(i, env) in syncEnvs">
+                                <div class="col-sm-12">
+                                    <div class="form-group col-sm-5">
+                                        <label>
+                                            Sync Environment URL
+                                        </label>
+                                        <div class="alert alert-danger" ng-if="!entryForm['syncEnvURL_' + $index].$valid  && hasSubmitted" ng-cloak>
+                                            <div ng-message="required">Sync Environment URL is required</div>
+                                        </div>
+                                        <input ng-disabled="isbtnRunDisabled()" type="text" placeholder="https://example.live.dynatrace.com" class="form-control" name="syncEnvURL_{{i}}" ng-model="env.url"
+                                            required></input>
+                                    </div>
+                                    <div class="form-group col-sm-5">
+                                        <label>
+                                            Sync Environment Token
+                                        </label>
+                                        <div class="alert alert-danger" ng-if="!entryForm['syncEnvToken_' + $index].$valid  && hasSubmitted" ng-cloak>
+                                            <div ng-message="required">Sync Environment token is required</div>
+                                        </div>
+                                        <input ng-disabled="isbtnRunDisabled()" type="text" placeholder="123-45678910111zwbwq" class="form-control" name="syncEnvToken_{{i}}" ng-model="env.token"
+                                            required></input>
+                                    </div>
+                                    <div class="form-group col-sm-2">
+                                        <button ng-disabled="isbtnRunDisabled()" type="button" ng-click="removeSyncEnv(i)" ng-hide="i < 1" class="btn btn-danger">Remove</button>
+                                        <button ng-disabled="isbtnRunDisabled()" type="button" ng-click="addSyncEnv()" ng-hide="i  < (syncEnvs.length -1)" ng-disabled="isbtnRunDisabled()" class="btn btn-primary">Add</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel panel-default">
+                        <div class="panel-body">
+                            <div class="alert alert-danger" ng-if="(!entryForm.addNonExistingEnabled.$valid || !entryForm.updateExistingEnabled.$valid)  && hasSubmitted"
+                                ng-cloak>
+                                <div ng-message="required">Please select at least one of the following checkboxs</div>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Add non-existing rules
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="updateExistingEnabled" ng-required="!updateExistingEnabled" type="checkbox" ng-model="addNonExistingEnabled">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Update existing rules
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="addNonExistingEnabled" ng-required="!addNonExistingEnabled" type="checkbox" ng-model="updateExistingEnabled">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel panel-default">
+                        <div class="panel-body">
+                            <div class="alert alert-danger" ng-if="(!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
+                                ng-cloak>
+                                <div ng-message="required">Please select at least one of the following checkboxs</div>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Request Attributes
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="requestAttributesEnabled" ng-required="!autoTaggingRulesEnabled && !managementZonesRulesEnabled" type="checkbox"
+                                    ng-model="requestAttributesEnabled">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Autotag rules
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="autoTaggingRulesEnabled" ng-required="!managementZonesRulesEnabled && !requestAttributesEnabled" type="checkbox"
+                                    ng-model="autoTaggingRulesEnabled">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Management zones rules
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="managementZonesRulesEnabled" ng-required="!autoTaggingRulesEnabled && !requestAttributesEnabled" type="checkbox"
+                                    ng-model="managementZonesRulesEnabled">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" ng-click="run()" ng-disabled="isbtnRunDisabled()" class="btn btn-primary" id="btnRun">Run</button>
+                </div>
+            </form>
+        </div>
+        <div class="panel panel-default">
+            <div class="panel panel-heading">
+                <h1>Syncing Environment
+                    <img id="loading" ng-hide="!isbtnRunDisabled()" src="https://thumbs.gfycat.com/AggressiveGrouchyHammerkop-max-1mb.gif" width="50"
+                        height="50" />
+                </h1>
+            </div>
+            <div class="panel panel-body">
+                <div id="log">
+                </div>
+            </div>
+        </div>
+</body>
+<script>
+    var app = angular.module('app', []);
+    app.factory('retrieveDataService', function ($http) {
+        var getAllData = function (url, token, endPoint) {
+            var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
+            return $http({ method: "GET", url: fullURL }).then(function (result) {
+                return result.data;
+            },
+                function (data) {
+                    log("ERROR-----------------------------");
+                    log("Status: "+ data.status);
+                    log("Status Text: "+ data.statusText);
+                    log("URL: "+ data.config.url);
+                    return null;
+                });
+        };
+        var getDetailsData = function (url, id, token, endPoint) {
+            var fullURL = url + "/api/config/v1/" + endPoint + "/" + id + "?Api-Token=" + token;
+            return $http({ method: "GET", url: fullURL }).then(function (result) {
+                return result.data;
+            },
+                function (data) {
+                    log("ERROR-----------------------------");
+                    log("Status: "+ data.status);
+                    log("Status Text: "+ data.statusText);
+                    log("URL: "+ data.config.url);
+                    return null;
+                }
+            );
+        };
+        var addItem = function (url, token, details, endPoint) {
+            var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
+            return $http({ method: "POST", url: fullURL, data: details }).then(function (result) {
+                return result.data;
+            },
+                function (data) {
+                    log("ERROR-----------------------------");
+                    log("Status: "+ data.status);
+                    log("Status Text: "+ data.statusText);
+                    log("URL: "+ data.config.url);
+                    return null;
+                });
+        };
+        var updateItem = function (url, token, details, endPoint) {
+            var fullURL = url + "/api/config/v1/" + endPoint + "/" + details.id + "?Api-Token=" + token;
+            return $http({ method: "PUT", url: fullURL, data: details }).then(function (result) {
+                return result.data;
+            },
+                function (data) {
+                    log("ERROR-----------------------------");
+                    log("Status: "+ data.status);
+                    log("Status Text: "+ data.statusText);
+                    log("URL: "+ data.config.url);
+                    return null;
+                });
+        };
+        function log(message) {
+            $('#log').append('<p>' + message + '</p>');
+        }
+        return { getAllData: getAllData, getDetailsData: getDetailsData, addItem: addItem, updateItem: updateItem };
+    });
+    app.controller('mainCtlr', function ($scope, retrieveDataService) {
+        $scope.runIsDisabled = false;
+
+        $scope.masterEnv = new Environment(null, null);
+
+        $scope.addNonExistingEnabled = false;
+        $scope.updateExistingEnabled = false;
+
+        $scope.requestAttributesEnabled = false;
+        $scope.autoTaggingRulesEnabled = false;
+        $scope.managementZonesRulesEnabled = false;
+
+        $scope.hasSubmitted = false;
+        $scope.syncEnvs = [
+            new Environment(null,null)
+        ];
+
+        $scope.run = function () {
+            $scope.hasSubmitted = true;
+            if ($scope.entryForm.$valid) {
+                $scope.runIsDisabled = true;
+                if ($scope.requestAttributesEnabled) {
+                    syncRules("requestAttributes", "values");
+                }
+                if ($scope.autoTaggingRulesEnabled) {
+                    syncRules("autoTags", "values");
+                }
+                if ($scope.managementZonesRulesEnabled) {
+                    syncRules("managementZones", "values");
+                }
+                $scope.runIsDisabled = false;
+            }
+        }
+
+        $scope.stop = function () {
+            $scope.masterToken = "stop";
+            $scope.stopIsDisabled = true;
+            $scope.runIsDisabled = false;
+        }
+        $scope.addSyncEnv = function () {
+            $scope.syncEnvs.push(new Environment(null, null))
+        }
+        $scope.removeSyncEnv = function (index) {
+            $scope.syncEnvs.splice(index, 1);
+        }
+        $scope.isbtnStopDisabled = function () {
+            return $scope.stopIsDisabled;
+        };
+        $scope.isbtnRunDisabled = function () {
+            return $scope.runIsDisabled;
+        };
+        function syncRules(endPoint, accessor) {
+            getConfigurations(endPoint, accessor);
+        }
+        function getConfigurations(endPoint, accessor, isAdding) {
+            log("GETTING MASTER ENVIRONMENT DATA");
+            log("BASE URL: " + $scope.masterEnv.url);
+            log("TOKEN: " + $scope.masterEnv.token);
+            var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, endPoint);
+            masterDataPromise.then(function (masterResult) {
+                if (masterResult != null) {
+                    $scope.masterEnv.config = masterResult[accessor];
+                    $scope.syncEnvs.forEach(env => {
+                        getSyncEnvConfig(env, endPoint, accessor);
+                    });
+                };
+            });
+        }
+        function getSyncEnvConfig(env, endPoint, accessor) {
+            log("GETTING SYNC ENVIRONMENT DATA");
+            log("BASE URL: " + env.url);
+            log("TOKEN: " + env.token);
+            var syncEnvDataPromise = retrieveDataService.getAllData(env.url, env.token, endPoint);
+            syncEnvDataPromise.then(function (syncResult) {
+                if (syncResult != null) {
+                    var syncConfig = syncResult[accessor];
+                    if ($scope.addNonExistingEnabled) {
+                        var diff = compare($scope.masterEnv.config, syncConfig);
+                        diff.forEach(item => {
+                            getItemDetailsForAdding(item, endPoint, env);
+                        });
+                    };
+                    if ($scope.updateExistingEnabled) {
+                        $scope.masterEnv.config.forEach( (item, index,arr) => {
+                            var syncItemID = findItemID(item.name, syncConfig);
+                        });
+                    };
+                };
+            });
+        }
+        function getItemDetailsForAdding(item, endPoint, env) {
+            log("GETTING DETAILS FOR ADDING");
+            log("ITEM NAME: " + item.name);
+            log("ITEM ID: " + item.id);
+            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint);
+            itemDetailsDataPromise.then(function (itemResult) {
+                if (itemResult != null) {
+                    var itemConfig = itemResult;
+                    addItem(itemConfig, endPoint, env);
+                };
+            });
+        }
+        function getItemDetailsForUpdating(item, syncID, endPoint, env) {
+            log("GETTING DETAILS FOR UPDATING");
+            log("ITEM NAME: " + item.name);
+            log("ITEM ID: " + item.id);
+            log("SYNC ID: " + syncID);
+            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint);
+            itemDetailsDataPromise.then(function (itemResult) {
+                if (itemResult != null) {
+                    var itemConfig = itemResult;
+                    itemConfig.id = syncID;
+                    updateItem(itemConfig, endPoint, env);
+                };
+            });
+        }
+        function addItem(details, endPoint, env) {
+            log("CREATING RULE");
+            log("BASE URL: " + env.url);
+            log("RULE NAME: " + details.name);
+            delete details.id;
+            var postItemDataPromise = retrieveDataService.addItem(env.url, env.token, details, endPoint);
+            postItemDataPromise.then(function (addResult) {
+                if (addResult != null) {
+                    log("SUCCESS: " + details.name);
+                };
+            });
+        }
+        function updateItem(details, endPoint, env) {
+            log("CREATING RULE");
+            log("BASE URL: " + env.url);
+            log("RULE NAME: " + details.name);
+            var postItemDataPromise = retrieveDataService.updateItem(env.url, env.token, details, endPoint);
+            postItemDataPromise.then(function (updateResult) {
+                if (updateResult != null) {
+                    log("SUCCESS: " + details.name);
+                }
+            });
+        }
+        function findItemID(name, list) {
+            var id = null;
+            list.forEach(item => {
+                if (item.name.toLowerCase() == name.toLowerCase()) {
+                    id = item.id;
+                }
+            });
+            return id;
+        }
+        function compare(listA, listB) {
+            var diff = []
+            listA.forEach(element => {
+                var isInList = false;
+                for (var i = 0; i < listB.length; i++) {
+                    if (element.name.toLowerCase() == listB[i].name.toLowerCase()) {
+                        isInList = true;
+                    }
+                }
+                if (!isInList) {
+                    diff.push(element);
+                }
+            });
+            return diff;
+        }
+        function log(message) {
+            $('#log').append('<p>' + message + '</p>');
+        }
+    });
+    class Environment {
+        constructor(url, token) {
+            this.url = url;
+            this.token = token;
+            this.config = null;
+        };
+    }
+
+</script>
