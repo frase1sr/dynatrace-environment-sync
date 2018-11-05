@@ -18,6 +18,8 @@ syncEnvList = [
 requestAttributesEnabled = True
 autoTaggingRulesEnabled = False
 managementZonesRulesEnabled = False
+
+#CURRENTLY NOT WORKING PLEASE DON'T UN-COMMENT 
 # customServicesEnabled = False
 
 addNotExisting = True
