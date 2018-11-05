@@ -16,6 +16,7 @@
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
 
 </head>
+
 <body>
     <div class="container" ng-app="app" ng-controller="mainCtlr">
         <div class="panel panel-info">
@@ -23,6 +24,10 @@
                 <h1>Information</h1>
             </div>
             <div class="panel panel-body">
+                <p>Please take note of the following</p>
+                <ul>
+                    <li>This application updates/determines if it exists based upon the configuration rules NAME</li>
+                </ul>
             </div>
         </div>
         <div class="panel panel-primary">
@@ -39,8 +44,8 @@
                         <div class="alert alert-danger" ng-if='!entryForm.masterEnvURL.$valid && hasSubmitted' ng-cloak>
                             <div ng-message="required">Master Environment base url is required</div>
                         </div>
-                        <input ng-disabled="isbtnRunDisabled()" name="masterEnvURL" ng-model="masterEnv.url" placeholder="https://example.live.dynatrace.com" type="text" class="form-control"
-                            required></input>
+                        <input ng-disabled="isbtnRunDisabled()" name="masterEnvURL" ng-model="masterEnv.url" placeholder="https://example.live.dynatrace.com"
+                            type="text" class="form-control" required></input>
                     </div>
                     <div class="form-group">
                         <label>
@@ -49,37 +54,45 @@
                         <div class="alert alert-danger" ng-if='!entryForm.masterEnvToken.$valid  && hasSubmitted' ng-cloak>
                             <div ng-message="required">Master Environment token is required</div>
                         </div>
-                        <input ng-disabled="isbtnRunDisabled()" name="masterEnvToken" ng-model="masterEnv.token" placeholder="123-45678910111zwbwq" type="text" class="form-control"
-                            id="masterToken" required></input>
+                        <input ng-disabled="isbtnRunDisabled()" name="masterEnvToken" ng-model="masterEnv.token" placeholder="123-45678910111zwbwq"
+                            type="text" class="form-control" id="masterToken" required></input>
                     </div>
                     <div class="panel panel-default">
                         <div class="panel-heading">Environments to sync</div>
                         <div class="panel-body">
                             <div ng-repeat="(i, env) in syncEnvs">
-                                <div class="col-sm-12">
-                                    <div class="form-group col-sm-5">
-                                        <label>
-                                            Sync Environment URL
-                                        </label>
-                                        <div class="alert alert-danger" ng-if="!entryForm['syncEnvURL_' + $index].$valid  && hasSubmitted" ng-cloak>
-                                            <div ng-message="required">Sync Environment URL is required</div>
+                                <div class="row">
+                                    <div class="col-sm-12">
+                                        <div class="form-group col-sm-5">
+                                            <label>
+                                                Sync Environment URL
+                                            </label>
+                                            <div class="alert alert-danger" ng-if="!entryForm['syncEnvURL_' + $index].$valid  && hasSubmitted" ng-cloak>
+                                                <div ng-message="required">Sync Environment URL is required</div>
+                                            </div>
+                                            <input ng-disabled="isbtnRunDisabled()" type="text" placeholder="https://example.live.dynatrace.com" class="form-control"
+                                                name="syncEnvURL_{{i}}" ng-model="env.url" required></input>
                                         </div>
-                                        <input ng-disabled="isbtnRunDisabled()" type="text" placeholder="https://example.live.dynatrace.com" class="form-control" name="syncEnvURL_{{i}}" ng-model="env.url"
-                                            required></input>
-                                    </div>
-                                    <div class="form-group col-sm-5">
-                                        <label>
-                                            Sync Environment Token
-                                        </label>
-                                        <div class="alert alert-danger" ng-if="!entryForm['syncEnvToken_' + $index].$valid  && hasSubmitted" ng-cloak>
-                                            <div ng-message="required">Sync Environment token is required</div>
+                                        <div class="form-group col-sm-5">
+                                            <label>
+                                                Sync Environment Token
+                                            </label>
+                                            <div class="alert alert-danger" ng-if="!entryForm['syncEnvToken_' + $index].$valid  && hasSubmitted" ng-cloak>
+                                                <div ng-message="required">Sync Environment token is required</div>
+                                            </div>
+                                            <input ng-disabled="isbtnRunDisabled()" type="text" placeholder="123-45678910111zwbwq" class="form-control" name="syncEnvToken_{{i}}"
+                                                ng-model="env.token" required></input>
                                         </div>
-                                        <input ng-disabled="isbtnRunDisabled()" type="text" placeholder="123-45678910111zwbwq" class="form-control" name="syncEnvToken_{{i}}" ng-model="env.token"
-                                            required></input>
+                                        <div class="form-group col-sm-1">
+                                            <label>&nbsp;</label>
+                                            <button ng-disabled="isbtnRunDisabled()" type="button" ng-click="removeSyncEnv(i)" ng-hide="2 > syncEnvs.length" class="btn btn-danger">Remove</button>
+                                        </div>
                                     </div>
-                                    <div class="form-group col-sm-2">
-                                        <button ng-disabled="isbtnRunDisabled()" type="button" ng-click="removeSyncEnv(i)" ng-hide="i < 1" class="btn btn-danger">Remove</button>
-                                        <button ng-disabled="isbtnRunDisabled()" type="button" ng-click="addSyncEnv()" ng-hide="i  < (syncEnvs.length -1)" ng-disabled="isbtnRunDisabled()" class="btn btn-primary">Add</button>
+                                </div>
+                                <div class="row">
+                                    <div class="form-group col-sm-12">
+                                        <button ng-disabled="isbtnRunDisabled()" type="button" ng-click="addSyncEnv()" ng-hide="i  < (syncEnvs.length -1)" ng-disabled="isbtnRunDisabled()"
+                                            class="btn btn-primary">Add</button>
                                     </div>
                                 </div>
                             </div>
@@ -95,13 +108,15 @@
                                 <label>
                                     Add non-existing rules
                                 </label>
-                                <input ng-disabled="isbtnRunDisabled()" name="updateExistingEnabled" ng-required="!updateExistingEnabled" type="checkbox" ng-model="addNonExistingEnabled">
+                                <input ng-disabled="isbtnRunDisabled()" name="updateExistingEnabled" ng-required="!updateExistingEnabled" type="checkbox"
+                                    ng-model="addNonExistingEnabled">
                             </div>
                             <div class="form-group">
                                 <label>
                                     Update existing rules
                                 </label>
-                                <input ng-disabled="isbtnRunDisabled()" name="addNonExistingEnabled" ng-required="!addNonExistingEnabled" type="checkbox" ng-model="updateExistingEnabled">
+                                <input ng-disabled="isbtnRunDisabled()" name="addNonExistingEnabled" ng-required="!addNonExistingEnabled" type="checkbox"
+                                    ng-model="updateExistingEnabled">
                             </div>
                         </div>
                     </div>
@@ -115,22 +130,22 @@
                                 <label>
                                     Request Attributes
                                 </label>
-                                <input ng-disabled="isbtnRunDisabled()" name="requestAttributesEnabled" ng-required="!autoTaggingRulesEnabled && !managementZonesRulesEnabled" type="checkbox"
-                                    ng-model="requestAttributesEnabled">
+                                <input ng-disabled="isbtnRunDisabled()" name="requestAttributesEnabled" ng-required="!autoTaggingRulesEnabled && !managementZonesRulesEnabled"
+                                    type="checkbox" ng-model="requestAttributesEnabled">
                             </div>
                             <div class="form-group">
                                 <label>
                                     Autotag rules
                                 </label>
-                                <input ng-disabled="isbtnRunDisabled()" name="autoTaggingRulesEnabled" ng-required="!managementZonesRulesEnabled && !requestAttributesEnabled" type="checkbox"
-                                    ng-model="autoTaggingRulesEnabled">
+                                <input ng-disabled="isbtnRunDisabled()" name="autoTaggingRulesEnabled" ng-required="!managementZonesRulesEnabled && !requestAttributesEnabled"
+                                    type="checkbox" ng-model="autoTaggingRulesEnabled">
                             </div>
                             <div class="form-group">
                                 <label>
                                     Management zones rules
                                 </label>
-                                <input ng-disabled="isbtnRunDisabled()" name="managementZonesRulesEnabled" ng-required="!autoTaggingRulesEnabled && !requestAttributesEnabled" type="checkbox"
-                                    ng-model="managementZonesRulesEnabled">
+                                <input ng-disabled="isbtnRunDisabled()" name="managementZonesRulesEnabled" ng-required="!autoTaggingRulesEnabled && !requestAttributesEnabled"
+                                    type="checkbox" ng-model="managementZonesRulesEnabled">
                             </div>
                         </div>
                     </div>
@@ -141,7 +156,7 @@
         <div class="panel panel-default">
             <div class="panel panel-heading">
                 <h1>Syncing Environment
-                    <img id="loading" ng-hide="!isbtnRunDisabled()" src="https://thumbs.gfycat.com/AggressiveGrouchyHammerkop-max-1mb.gif" width="50"
+                    <img id="loading" ng-hide="!runIsDisabled" src="https://thumbs.gfycat.com/AggressiveGrouchyHammerkop-max-1mb.gif" width="50"
                         height="50" />
                 </h1>
             </div>
@@ -157,26 +172,28 @@
         var getAllData = function (url, token, endPoint) {
             var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
             return $http({ method: "GET", url: fullURL }).then(function (result) {
+                log("Response Code: " + result.status);
                 return result.data;
             },
                 function (data) {
                     log("ERROR-----------------------------");
-                    log("Status: "+ data.status);
-                    log("Status Text: "+ data.statusText);
-                    log("URL: "+ data.config.url);
+                    log("Status: " + data.status);
+                    log("Status Text: " + data.statusText);
+                    log("URL: " + data.config.url);
                     return null;
                 });
         };
         var getDetailsData = function (url, id, token, endPoint) {
             var fullURL = url + "/api/config/v1/" + endPoint + "/" + id + "?Api-Token=" + token;
             return $http({ method: "GET", url: fullURL }).then(function (result) {
+                log("Response Code: " + result.status);
                 return result.data;
             },
                 function (data) {
                     log("ERROR-----------------------------");
-                    log("Status: "+ data.status);
-                    log("Status Text: "+ data.statusText);
-                    log("URL: "+ data.config.url);
+                    log("Status: " + data.status);
+                    log("Status Text: " + data.statusText);
+                    log("URL: " + data.config.url);
                     return null;
                 }
             );
@@ -184,26 +201,29 @@
         var addItem = function (url, token, details, endPoint) {
             var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
             return $http({ method: "POST", url: fullURL, data: details }).then(function (result) {
+                log("Response Code: " + result.status);
                 return result.data;
             },
                 function (data) {
                     log("ERROR-----------------------------");
-                    log("Status: "+ data.status);
-                    log("Status Text: "+ data.statusText);
-                    log("URL: "+ data.config.url);
+                    log("Status: " + data.status);
+                    log("Status Text: " + data.statusText);
+                    log("URL: " + data.config.url);
                     return null;
                 });
         };
         var updateItem = function (url, token, details, endPoint) {
             var fullURL = url + "/api/config/v1/" + endPoint + "/" + details.id + "?Api-Token=" + token;
+            log("MADE PUT TO: " + fullURL);
             return $http({ method: "PUT", url: fullURL, data: details }).then(function (result) {
+                log("Response Code: " + result.status);
                 return result.data;
             },
                 function (data) {
                     log("ERROR-----------------------------");
-                    log("Status: "+ data.status);
-                    log("Status Text: "+ data.statusText);
-                    log("URL: "+ data.config.url);
+                    log("Status: " + data.status);
+                    log("Status Text: " + data.statusText);
+                    log("URL: " + data.config.url);
                     return null;
                 });
         };
@@ -216,6 +236,9 @@
         $scope.runIsDisabled = false;
 
         $scope.masterEnv = new Environment(null, null);
+        $scope.syncEnvs = [
+            new Environment(null, null)
+        ];
 
         $scope.addNonExistingEnabled = false;
         $scope.updateExistingEnabled = false;
@@ -225,13 +248,26 @@
         $scope.managementZonesRulesEnabled = false;
 
         $scope.hasSubmitted = false;
-        $scope.syncEnvs = [
-            new Environment(null,null)
-        ];
 
+        $scope.hasUpdatedLog = false;
+        $scope.checkIfDone = function () {
+            var handler = setInterval(function () {
+                debugger;
+                if ($scope.hasUpdatedLog) {
+                    $scope.hasUpdatedLog = false
+                }
+                else {
+                    $scope.$apply(function () {
+                        $scope.runIsDisabled = false;
+                    })
+                    clearInterval(handler);
+                }
+            }, 2000);
+        }
         $scope.run = function () {
             $scope.hasSubmitted = true;
             if ($scope.entryForm.$valid) {
+                $('#log').empty();
                 $scope.runIsDisabled = true;
                 if ($scope.requestAttributesEnabled) {
                     syncRules("requestAttributes", "values");
@@ -242,14 +278,8 @@
                 if ($scope.managementZonesRulesEnabled) {
                     syncRules("managementZones", "values");
                 }
-                $scope.runIsDisabled = false;
+                console.log($scope.checkIfDone());
             }
-        }
-
-        $scope.stop = function () {
-            $scope.masterToken = "stop";
-            $scope.stopIsDisabled = true;
-            $scope.runIsDisabled = false;
         }
         $scope.addSyncEnv = function () {
             $scope.syncEnvs.push(new Environment(null, null))
@@ -257,9 +287,6 @@
         $scope.removeSyncEnv = function (index) {
             $scope.syncEnvs.splice(index, 1);
         }
-        $scope.isbtnStopDisabled = function () {
-            return $scope.stopIsDisabled;
-        };
         $scope.isbtnRunDisabled = function () {
             return $scope.runIsDisabled;
         };
@@ -287,7 +314,7 @@
             var syncEnvDataPromise = retrieveDataService.getAllData(env.url, env.token, endPoint);
             syncEnvDataPromise.then(function (syncResult) {
                 if (syncResult != null) {
-                    var syncConfig = syncResult[accessor];
+                    var syncConfig = syncResult[accessor];;
                     if ($scope.addNonExistingEnabled) {
                         var diff = compare($scope.masterEnv.config, syncConfig);
                         diff.forEach(item => {
@@ -295,8 +322,11 @@
                         });
                     };
                     if ($scope.updateExistingEnabled) {
-                        $scope.masterEnv.config.forEach( (item, index,arr) => {
+                        $scope.masterEnv.config.forEach((item, index, arr) => {
                             var syncItemID = findItemID(item.name, syncConfig);
+                            if (syncItemID != null) {
+                                getItemDetailsForUpdating(item, syncItemID, endPoint, env);
+                            }
                         });
                     };
                 };
@@ -341,7 +371,7 @@
             });
         }
         function updateItem(details, endPoint, env) {
-            log("CREATING RULE");
+            log("UPDATING RULE");
             log("BASE URL: " + env.url);
             log("RULE NAME: " + details.name);
             var postItemDataPromise = retrieveDataService.updateItem(env.url, env.token, details, endPoint);
@@ -376,10 +406,11 @@
             return diff;
         }
         function log(message) {
+            $scope.hasUpdatedLog = true;
             $('#log').append('<p>' + message + '</p>');
         }
     });
-    
+
     class Environment {
         constructor(url, token) {
             this.url = url;
