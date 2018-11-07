@@ -24,7 +24,7 @@ HOW TO RUN
 	 <li>Change the configuration varibles at the top of the files.</li>
 		<ul><li>masterEnv = "https://INSERT_ID.live.dynatrace.com/api/config/v1/" the environment path that you would like to copy the configurations FROM</li>
 		<li>masterEnvToken =  "INSERT_TOKEN" the environment token that you would like to copy the configurations TO</li>
-		<li>syncEnv = "https://INSERT_ID.live.dynatrace.com/api/config/v1/" the environment path that you would like to copy the configurations from</li><li>syncEnvToken = "INSERT_TOKEN" the environment token that you would like to copy the configurations TO</li>
+		<li>syncEnvs = ["https://INSERT_ID.live.dynatrace.com/api/config/v1/,"asdfas"] the environment path that you would like to copy the configurations from</li><li>syncEnvToken = "INSERT_TOKEN" the environment token that you would like to copy the configurations TO</li>
 		<li>requestAttributesEnabled = "True" if you would like to sync the Request Attributes configurationv</li>   
 		<li>autoTaggingRulesEnabled = "True" if you would like to sync the Automatically applied tags configurations</li>
 		<li>managementZonesRulesEnabled = "True" if you would like to sync the Managment Zones confguration</li>
