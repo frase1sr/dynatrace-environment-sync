@@ -385,10 +385,8 @@
                 $scope.currentRequests--;
                 if (itemResult != null) {
                     log("SUCCESS: " + itemResult.name);
-                    if (false) {
-                        var itemConfig = itemResult;
-                        addItem(itemConfig, endPoint, env);
-                    };
+                    var itemConfig = itemResult;
+                    addItem(itemConfig, endPoint, env);
                 };
             });
         }
@@ -402,9 +400,8 @@
                     log("SUCCESS: " + itemResult.name);
                     var itemConfig = itemResult;
                     itemConfig.id = syncID;
-                    if (false) {
-                        updateItem(itemConfig, endPoint, env);
-                    }
+                    updateItem(itemConfig, endPoint, env);
+
                 };
             });
         }
