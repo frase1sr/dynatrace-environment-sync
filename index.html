@@ -27,6 +27,7 @@
                 <p>Please take note of the following</p>
                 <ul>
                     <li>This application updates/determines if it exists based upon the configuration rules NAME</li>
+                    <li>Custom Services: currently ONLY transfers Java services</li>
                 </ul>
             </div>
         </div>
@@ -122,7 +123,7 @@
                     </div>
                     <div class="panel panel-default">
                         <div class="panel-body">
-                            <div class="alert alert-danger" ng-if="(!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
+                            <div class="alert alert-danger" ng-if="(!entryForm.customServicesEnabled.$valid||!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
                                 ng-cloak>
                                 <div ng-message="required">Please select at least one of the following checkboxs</div>
                             </div>
@@ -146,6 +147,13 @@
                                 </label>
                                 <input ng-disabled="isbtnRunDisabled()" name="managementZonesRulesEnabled" ng-required="$scope.rulesType == null" type="radio"
                                     ng-model="rulesType" value="managementZone">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Custom Services
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="customServicesEnabled" ng-required="$scope.rulesType == null" type="radio"
+                                    ng-model="rulesType" value="customServices">
                             </div>
                         </div>
                     </div>
@@ -172,7 +180,7 @@
         var getAllData = function (url, token, endPoint) {
             var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
             return $http({ method: "GET", url: fullURL }).then(function (result) {
-                return result.data;
+                return { 'data': result.data, 'url': result.config.url };
             },
                 function (data) {
                     if (data.status != 429) {
@@ -219,6 +227,7 @@
             },
                 function (data) {
                     if (data.status != 429) {
+                        debugger;
                         log("ERROR-----------------------------");
                         log("Status: " + data.status);
                         log("Status Text: " + data.statusText);
@@ -242,6 +251,7 @@
             },
                 function (data) {
                     if (data.status != 429) {
+                        debugger;
                         log("ERROR-----------------------------");
                         log("Status: " + data.status);
                         log("Status Text: " + data.statusText);
@@ -275,38 +285,14 @@
         };
         return { getAllData: getAllData, getDetailsData: getDetailsData, addItem: addItem, updateItem: updateItem };
     });
-    app.controller('mainCtlr', function ($scope, retrieveDataService) {
+    app.controller('mainCtlr', function ($scope, retrieveDataService, $q) {
         $scope.runIsDisabled = false;
 
         $scope.masterEnv = new Environment(null, null);
-
         $scope.syncEnvs = [
-
-            new Environment(null, null),
+            new Environment(null,null)
         ];
 
-        $scope.currentRequests = 0;
-
-        $scope.type = null;
-        $scope.rulesType = null
-
-        $scope.hasSubmitted = false;
-
-        $scope.hasUpdatedLog = false;
-        $scope.checkIfDone = function () {
-            var handler = setInterval(function () {
-
-                if ($scope.hasUpdatedLog) {
-                    $scope.hasUpdatedLog = false
-                }
-                else if (!$scope.hasUpdatedLog && $scope.currentRequests == 0) {
-                    $scope.$apply(function () {
-                        $scope.runIsDisabled = false;
-                    })
-                    clearInterval(handler);
-                }
-            }, 2000);
-        }
         $scope.run = function () {
             $scope.hasSubmitted = true;
             if ($scope.entryForm.$valid) {
@@ -321,7 +307,12 @@
                 if ($scope.rulesType == 'managementZone') {
                     syncRules("managementZones", "values");
                 }
-                $scope.checkIfDone();
+                if ($scope.rulesType == 'customServices') {
+                    syncRules("customServices/java", "customServices");
+                    //syncRules("customServices/dotNet", "customServices");
+                    //syncRules("customServices/php", "customServices");
+                    // syncRules("customServices/go", "customServices");
+                }
             }
         }
         $scope.addSyncEnv = function () {
@@ -339,107 +330,143 @@
         function getConfigurations(endPoint, accessor, isAdding) {
             log("GETTING MASTER ENVIRONMENT DATA " + $scope.masterEnv.url + " USING TOKEN " + $scope.masterEnv.token);
             var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, endPoint);
-            $scope.currentRequests++;
             masterDataPromise.then(function (masterResult) {
-                $scope.currentRequests--;
                 if (masterResult != null) {
                     log("SUCCESS GETING DETAILS FOR MASTER ENV " + $scope.masterEnv.url);
-                    $scope.masterEnv.config = masterResult[accessor];
+                    $scope.masterEnv.config = masterResult.data[accessor];
+                    getSyncEnvsConfig(endPoint, accessor);
+                };
+            });
+        }
+        function getSyncEnvsConfig(endPoint, accessor) {
+            promises = []
+            $scope.syncEnvs.forEach(env => {
+                log("GETTING SYNC ENVIRONMENT DATA FOR " + env.url + " USING TOKEN " + env.token);
+                promises.push(retrieveDataService.getAllData(env.url, env.token, endPoint));
+            });
+            $q.all(promises).then(function (syncResults) {
+                if (syncResults != null) {
                     $scope.syncEnvs.forEach(env => {
-                        getSyncEnvConfig(env, endPoint, accessor);
+                        var response = syncResults.filter(function (item) {
+                            return item.url.includes(env.url);
+                        })[0];
+                        env.config = response.data[accessor]
                     });
-                };
-            });
-        }
-        function getSyncEnvConfig(env, endPoint, accessor) {
-            log("GETTING SYNC ENVIRONMENT DATA FOR " + env.url + " USING TOKEN " + env.token);
-            var syncEnvDataPromise = retrieveDataService.getAllData(env.url, env.token, endPoint);
-            $scope.currentRequests++;
-            syncEnvDataPromise.then(function (syncResult) {
-                $scope.currentRequests--;
-                if (syncResult != null) {
-                    log("SUCCESS GETING DETAILS FOR SYNC ENV " + env.url);
-                    var syncConfig = syncResult[accessor];;
-                    if ($scope.type == 'add') {
-                        var diff = compare($scope.masterEnv.config, syncConfig);
-                        diff.forEach(item => {
-                            getItemDetailsForAdding(item, endPoint, env);
-                        });
-                    };
-                    if ($scope.type == 'update') {
-                        $scope.masterEnv.config.forEach((item) => {
-                            var syncItemID = findItemID(item.name, syncConfig);
-                            if (syncItemID != null) {
-                                getItemDetailsForUpdating(item, syncItemID, endPoint, env);
-                            }
-                        });
-                    };
-                };
-            });
-        }
-        function getItemDetailsForAdding(item, endPoint, env) {
-            log("GETTING DETAILS FOR ADDING FOR " + item.name + " IN " + env.url);
-            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint);
-            $scope.currentRequests++;
-            itemDetailsDataPromise.then(function (itemResult) {
-                $scope.currentRequests--;
-                if (itemResult != null) {
-                    log("SUCCESS: " + itemResult.name);
-                    var itemConfig = itemResult;
-                    addItem(itemConfig, endPoint, env);
-                };
-            });
-        }
-        function getItemDetailsForUpdating(item, syncID, endPoint, env) {
-            log("GETTING DETAILS FOR UPDATING FOR " + item.name + " IN " + env.url);
-            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint);
-            $scope.currentRequests++;
-            itemDetailsDataPromise.then(function (itemResult) {
-                $scope.currentRequests--;
-                if (itemResult != null) {
-                    log("SUCCESS: " + itemResult.name);
-                    var itemConfig = itemResult;
-                    itemConfig.id = syncID;
-                    updateItem(itemConfig, endPoint, env);
+                    getItemDetailsForMaster(endPoint);
 
                 };
             });
         }
-        function addItem(details, endPoint, env) {
-            log("CREATING RULE FOR " + details.name + " IN " + env.url);
-            delete details.id;
-            var postItemDataPromise = retrieveDataService.addItem(env.url, env.token, details, endPoint);
-            $scope.currentRequests++;
-            postItemDataPromise.then(function (addResult) {
-                $scope.currentRequests--;
-                if (addResult != null) {
-                    log("SUCCESS: " + details.name);
+        function getItemDetailsForMaster(endPoint) {
+            promises = []
+            $scope.masterEnv.config.forEach(item => {
+                log("GETTING DETAILS FOR " + item.name + " IN " + $scope.masterEnv.url);
+                promises.push(retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint));
+            });
+            $q.all(promises).then(function (itemResults) {
+                if (itemResults != null) {
+                    $scope.masterEnv.config = itemResults;
+                    if ($scope.type == 'add') {
+                        getItemDetailsForAdding(endPoint);
+                    };
+                    if ($scope.type == 'update') {
+                        getItemDetailsForUpdating(endPoint);
+                    };
                 };
             });
         }
-        function updateItem(details, endPoint, env) {
-            log("UPDATING RULE");
-            log("BASE URL: " + env.url);
-            log("RULE NAME: " + details.name);
-            $scope.currentRequests++;
-            var postItemDataPromise = retrieveDataService.updateItem(env.url, env.token, details, endPoint);
-            postItemDataPromise.then(function (updateResult) {
-                $scope.currentRequests--;
-                if (updateResult != null) {
-                    log("SUCCESS: " + details.name);
-                }
+        function getItemDetailsForAdding(endPoint, env) {
+            var diff = [];
+            $scope.syncEnvs.forEach(env => {
+                comp = compare($scope.masterEnv.config, env.config, env.url, env.token);
+                diff = diff.concat(comp);
+
             });
+            addItems(diff, endPoint)
         }
-        function findItemID(name, list) {
-            var id = null;
+        function getItemDetailsForUpdating(endPoint) {
+
+            items = []
+            $scope.masterEnv.config.forEach(details => {
+                $scope.syncEnvs.forEach(env => {
+                    var syncItem = findItem(details.name, env.config);
+                    if (syncItem != null) {
+                        newDetails = JSON.parse(JSON.stringify(details));
+                        newDetails.id = syncItem.id;
+                        newDetails.name = syncItem.name;
+                        items.push({ 'rule': newDetails, 'url': env.url, 'token': env.token });
+                    }
+                });
+            });
+            updateItems(items, endPoint)
+        }
+
+        function addItems(list, endPoint) {
+            promises = []
             list.forEach(item => {
-                if (item.name.toLowerCase() == name.toLowerCase()) {
+                details = item.rule
+                log("CREATING RULE FOR " + details.name + " IN " + item.url);
+                details = item.rule
+                delete details.id;
+                if (details.rules != undefined) {
+                    details.rules.forEach(element => {
+                        delete element.id;
+                        if (element.methodRules != undefined) {
+                            element.methodRules.forEach(item => {
+                                delete item.id;
+                            });
+                        }
+                    });
+                }
+                promises.push(retrieveDataService.addItem(item.url, item.token, details, endPoint));
+            });
+            if (promises.length == 0) {
+                $scope.runIsDisabled = false;
+            }
+            else {
+                $q.all(promises).then(function (addResults) {
+                    addResults.forEach(element => {
+                        log('id: ' + element.id + ' name: ' + element.name);
+                        $scope.runIsDisabled = false;
+                    });
+                });
+            }
+        }
+        function updateItems(list, endPoint) {
+            promises = []
+            list.forEach(item => {
+                details = item.rule
+                log("UPDATING RULE FOR " + details.name + " IN " + item.url);
+                promises.push(retrieveDataService.updateItem(item.url, item.token, details, endPoint));
+            });
+            if (promises.length == 0) {
+                $scope.runIsDisabled = false;
+            }
+            else {
+                $q.all(promises).then(function (addResults) {
+                    $scope.runIsDisabled = false;
+
+                });
+            }
+        }
+        function findItem(name, list) {
+            var id = '';
+            var responseName = '';
+            list.forEach(item => {
+                if (item.name.toLowerCase().replace(/ /g, '') == name.toLowerCase().replace(/ /g, '')) {
                     id = item.id;
+                    responseName = item.name;
                 }
             });
-            return id;
+
+            if (id != '') {
+                return { 'id': id, 'name': responseName };
+            }
+            return null
         }
-        function compare(listA, listB) {
+
+
+        function compare(listA, listB, url, token) {
             var diff = []
             listA.forEach(element => {
                 var isInList = false;
@@ -449,17 +476,15 @@
                     }
                 }
                 if (!isInList) {
-                    diff.push(element);
+                    diff.push({ 'rule': element, 'url': url, 'token': token });
                 }
             });
             return diff;
         }
         function log(message) {
-            $scope.hasUpdatedLog = true;
             $('#log').append('<p>' + message + '</p>');
         }
     });
-
     class Environment {
         constructor(url, token) {
             this.url = url;
