@@ -27,22 +27,21 @@
                 <p>Please take note of the following</p>
                 <ul>
                     <li>This application updates/determines if it exists based upon the configuration rules NAME</li>
-                    <li>Custom Services: currently ONLY transfers Java services</li>
                 </ul>
             </div>
         </div>
+
         <div class="panel panel-primary">
-            <form name="entryForm">
+            <form name="entryFormDTEnv">
                 <div class="panel panel-heading">
                     <h1>Dynatrace Environment</h1>
                 </div>
                 <div class="panel panel-body">
-
                     <div class="form-group">
                         <label>
-                            Dynatrace Master Environment URL
+                            Dynatrace Environment URL
                         </label>
-                        <div class="alert alert-danger" ng-if='!entryForm.masterEnvURL.$valid && hasSubmitted' ng-cloak>
+                        <div class="alert alert-danger" ng-if='!entryFormDTEnv.masterEnvURL.$valid && hasSubmittedDTenv' ng-cloak>
                             <div ng-message="required">Master Environment base url is required</div>
                         </div>
                         <input ng-disabled="isbtnRunDisabled()" name="masterEnvURL" ng-model="masterEnv.url" placeholder="https://example.live.dynatrace.com"
@@ -52,12 +51,22 @@
                         <label>
                             Master Token
                         </label>
-                        <div class="alert alert-danger" ng-if='!entryForm.masterEnvToken.$valid  && hasSubmitted' ng-cloak>
+                        <div class="alert alert-danger" ng-if='!entryFormDTEnv.masterEnvToken.$valid  && hasSubmittedDTenv' ng-cloak>
                             <div ng-message="required">Master Environment token is required</div>
                         </div>
                         <input ng-disabled="isbtnRunDisabled()" name="masterEnvToken" ng-model="masterEnv.token" placeholder="123-45678910111zwbwq"
                             type="text" class="form-control" id="masterToken" required></input>
                     </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel panel-primary">
+            <form name="entryForm">
+                <div class="panel panel-heading">
+                    <h1>Sync Environment</h1>
+                </div>
+                <div class="panel panel-body">
                     <div class="panel panel-default">
                         <div class="panel-heading">Environments to sync</div>
                         <div class="panel-body">
@@ -123,7 +132,7 @@
                     </div>
                     <div class="panel panel-default">
                         <div class="panel-body">
-                            <div class="alert alert-danger" ng-if="(!entryForm.customServicesEnabled.$valid||!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
+                            <div class="alert alert-danger" ng-if="(!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
                                 ng-cloak>
                                 <div ng-message="required">Please select at least one of the following checkboxs</div>
                             </div>
@@ -148,19 +157,31 @@
                                 <input ng-disabled="isbtnRunDisabled()" name="managementZonesRulesEnabled" ng-required="$scope.rulesType == null" type="radio"
                                     ng-model="rulesType" value="managementZone">
                             </div>
-                            <div class="form-group">
-                                <label>
-                                    Custom Services
-                                </label>
-                                <input ng-disabled="isbtnRunDisabled()" name="customServicesEnabled" ng-required="$scope.rulesType == null" type="radio"
-                                    ng-model="rulesType" value="customServices">
-                            </div>
                         </div>
                     </div>
                     <button type="button" ng-click="run()" ng-disabled="isbtnRunDisabled()" class="btn btn-primary" id="btnRun">Run</button>
                 </div>
             </form>
         </div>
+
+        <!-- Create Management Zones -->
+
+        <div class="panel panel-primary">
+            <form name="entryFormMZ">
+                <div class="panel panel-heading">
+                    <h1>Create Management Zones based on Host Groups</h1>
+                    <p>This button will analyze your environment and create a Management Zone for each Host group that you have in the master environment.</p>
+                    <div class="alert alert-danger" ng-if='sowError' ng-cloak>
+                        <div ng-message="required">You are missing some required fields</div>
+                    </div>
+                </div>
+                <div class="panel panel-body">
+                    <button type="button" ng-click="run2()" ng-disabled="isbtnRunDisabled()" class="btn btn-primary" id="btnRun">Run</button>
+                </div>
+            </form>
+        </div>
+        <!-- end Create Management Zones -->
+
         <div class="panel panel-default">
             <div class="panel panel-heading">
                 <h1>Logs
@@ -177,10 +198,10 @@
 <script>
     var app = angular.module('app', []);
     app.factory('retrieveDataService', function ($http, $q, $rootScope) {
-        var getAllData = function (url, token, endPoint) {
-            var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
+        var getAllData = function (url, token, endPoint, config) {
+            var fullURL = url + (config ? "/api/config/v1/" : "/api/v1/") + endPoint + "?Api-Token=" + token;
             return $http({ method: "GET", url: fullURL }).then(function (result) {
-                return { 'data': result.data, 'url': result.config.url };
+                return result.data;
             },
                 function (data) {
                     if (data.status != 429) {
@@ -193,13 +214,13 @@
                     else {
                         log("HIT REQUEST LIMIT WAITING 60 SECONDS TO GET ALL DATA FOR " + url);
                         return sleep(60000).then(function () {
-                            return getAllData(url, token, endPoint);
+                            return getAllData(url, token, endPoint, config);
                         });
                     }
                 });
         };
-        var getDetailsData = function (url, id, token, endPoint) {
-            var fullURL = url + "/api/config/v1/" + endPoint + "/" + id + "?Api-Token=" + token;
+        var getDetailsData = function (url, id, token, endPoint, config) {
+            var fullURL = url + (config ? "/api/config/v1/" : "/api/v1/") + endPoint + "/" + id + "?Api-Token=" + token;
             return $http({ method: "GET", url: fullURL }).then(function (result) {
                 return result.data;
             },
@@ -220,14 +241,14 @@
                 }
             );
         };
-        var addItem = function (url, token, details, endPoint) {
-            var fullURL = url + "/api/config/v1/" + endPoint + "?Api-Token=" + token;
+        var addItem = function (url, token, details, endPoint, config) {
+            var fullURL = url + (config ? "/api/config/v1/" : "/api/v1/") + endPoint + "?Api-Token=" + token;
+            log("MADE POST TO: " + fullURL);
             return $http({ method: "POST", url: fullURL, data: details }).then(function (result) {
                 return result.data;
             },
                 function (data) {
                     if (data.status != 429) {
-                        debugger;
                         log("ERROR-----------------------------");
                         log("Status: " + data.status);
                         log("Status Text: " + data.statusText);
@@ -242,8 +263,8 @@
                     }
                 });
         };
-        var updateItem = function (url, token, details, endPoint) {
-            var fullURL = url + "/api/config/v1/" + endPoint + "/" + details.id + "?Api-Token=" + token;
+        var updateItem = function (url, token, details, endPoint, config) {
+            var fullURL = url + (config ? "/api/config/v1/" : "/api/v1/") + endPoint + "/" + details.id + "?Api-Token=" + token;
             log("MADE PUT TO: " + fullURL);
             return $http({ method: "PUT", url: fullURL, data: details }).then(function (result) {
                 log("Response Code: " + result.status);
@@ -251,7 +272,6 @@
             },
                 function (data) {
                     if (data.status != 429) {
-                        debugger;
                         log("ERROR-----------------------------");
                         log("Status: " + data.status);
                         log("Status Text: " + data.statusText);
@@ -285,16 +305,43 @@
         };
         return { getAllData: getAllData, getDetailsData: getDetailsData, addItem: addItem, updateItem: updateItem };
     });
-    app.controller('mainCtlr', function ($scope, retrieveDataService, $q) {
+    app.controller('mainCtlr', function ($scope, retrieveDataService) {
         $scope.runIsDisabled = false;
 
         $scope.masterEnv = new Environment(null, null);
+
         $scope.syncEnvs = [
-            new Environment(null,null)
+
+            new Environment(null, null),
         ];
 
+        $scope.currentRequests = 0;
+
+        $scope.type = null;
+        $scope.rulesType = null
+
+        $scope.hasSubmitted = false;
+        $scope.hasSubmittedDTenv = false;
+        $scope.sowError = false;
+
+        $scope.hasUpdatedLog = false;
+        $scope.checkIfDone = function () {
+            var handler = setInterval(function () {
+
+                if ($scope.hasUpdatedLog) {
+                    $scope.hasUpdatedLog = false
+                }
+                else if (!$scope.hasUpdatedLog && $scope.currentRequests == 0) {
+                    $scope.$apply(function () {
+                        $scope.runIsDisabled = false;
+                    })
+                    clearInterval(handler);
+                }
+            }, 2000);
+        }
         $scope.run = function () {
             $scope.hasSubmitted = true;
+            $scope.hasSubmittedDTenv = true;
             if ($scope.entryForm.$valid) {
                 $('#log').empty();
                 $scope.runIsDisabled = true;
@@ -307,14 +354,141 @@
                 if ($scope.rulesType == 'managementZone') {
                     syncRules("managementZones", "values");
                 }
-                if ($scope.rulesType == 'customServices') {
-                    syncRules("customServices/java", "customServices");
-                    //syncRules("customServices/dotNet", "customServices");
-                    //syncRules("customServices/php", "customServices");
-                    // syncRules("customServices/go", "customServices");
-                }
+                $scope.checkIfDone();
             }
         }
+        
+        $scope.run2 = function () {
+            $scope.sowError = false;
+            $scope.hasSubmittedDTenv = true;
+            if ($scope.entryFormDTEnv.$valid) {
+                $('#log').empty();
+                getMZandHGConfigurations()
+                $scope.checkIfDone();
+            }else{
+                $scope.sowError = true;
+            }
+        }
+
+        function getMZandHGConfigurations() {
+            $scope.masterEnv.manageZones = [ ]
+            $scope.masterEnv.hostGroup = [ ]
+            log("GETTING MASTER ENVIRONMENT DATA " + $scope.masterEnv.url + " USING TOKEN " + $scope.masterEnv.token);
+
+            //get info of Management zones
+            var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, "managementZones", true)
+
+            $scope.currentRequests++;
+            masterDataPromise.then(function (masterResult) {
+                $scope.currentRequests--;
+                if (masterResult != null) {
+                    log("SUCCESS GETING MANAGEMENT ZONES DETAILS OF " + $scope.masterEnv.url);
+                    $scope.masterEnv.config = masterResult["values"];
+                    $scope.masterEnv.config.forEach(mz => {
+                        if (!$scope.masterEnv.manageZones.includes(mz["name"])){
+                            $scope.masterEnv.manageZones.push(mz["name"])
+                        }
+                    });
+
+                    // Get info from Host Groups
+                    var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, "entity/infrastructure/hosts", false);
+
+                    masterDataPromise.then((masterResult) => {
+                        if (masterResult != null) {
+                            log("SUCCESS GETING HOST GROUPS DETAILS OF " + $scope.masterEnv.url);
+                            masterResult.forEach(hg => {
+                                if (hg["hostGroup"] != undefined){
+                                    var temp = hg["hostGroup"] 
+                                    if (!$scope.masterEnv.hostGroup.includes(temp["name"]) && !$scope.masterEnv.manageZones.includes("@" + temp["name"])){
+                                        $scope.masterEnv.hostGroup.push(temp["name"])
+                                    }
+                                }
+                            })
+                            if($scope.masterEnv.hostGroup.length > 0){
+
+                                addMZ($scope.masterEnv.hostGroup)
+                            }
+                            else{
+                                log("ALL THE HOST GROUPS ALREADY HAVE A MANAGEMENT ZONE")
+                            }
+                        };
+                    });
+                };
+            });
+        }
+
+        function addMZ(MZList) {
+            log("CREATING MZ FOR " + MZList + " IN " + $scope.masterEnv.url);
+            MZList.forEach(MZ => {
+                // modify this section if you want to use different rules for your management zone
+                var details = {
+                    "name": "@" + MZ,
+                    "rules": [
+                        {
+                            "type": "SERVICE",
+                            "enabled": true,
+                            "propagationTypes": [],
+                            "conditions": [
+                                {
+                                    "key": {
+                                        "attribute": "HOST_GROUP_NAME"
+                                    },
+                                    "comparisonInfo": {
+                                        "type": "STRING",
+                                        "operator": "EQUALS",
+                                        "value": MZ,
+                                        "negate": false,
+                                        "caseSensitive": true
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "type": "PROCESS_GROUP",
+                            "enabled": true,
+                            "propagationTypes": [],
+                            "conditions": [
+                                {
+                                    "key": {
+                                        "attribute": "HOST_GROUP_NAME"
+                                    },
+                                    "comparisonInfo": {
+                                        "type": "STRING",
+                                        "operator": "EQUALS",
+                                        "value": MZ,
+                                        "negate": false,
+                                        "caseSensitive": true
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "type": "HOST",
+                            "enabled": true,
+                            "propagationTypes": [],
+                            "conditions": [
+                                {
+                                    "key": {
+                                        "attribute": "HOST_GROUP_NAME"
+                                    },
+                                    "comparisonInfo": {
+                                        "type": "STRING",
+                                        "operator": "EQUALS",
+                                        "value": MZ,
+                                        "negate": false,
+                                        "caseSensitive": true
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+                var postItemDataPromise = retrieveDataService.addItem($scope.masterEnv.url, $scope.masterEnv.token, details, "managementZones", true);
+            } )
+        }
+                
+        
+        
         $scope.addSyncEnv = function () {
             $scope.syncEnvs.push(new Environment(null, null))
         }
@@ -329,144 +503,108 @@
         }
         function getConfigurations(endPoint, accessor, isAdding) {
             log("GETTING MASTER ENVIRONMENT DATA " + $scope.masterEnv.url + " USING TOKEN " + $scope.masterEnv.token);
-            var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, endPoint);
+            var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, endPoint, true);
+            $scope.currentRequests++;
             masterDataPromise.then(function (masterResult) {
+                $scope.currentRequests--;
                 if (masterResult != null) {
                     log("SUCCESS GETING DETAILS FOR MASTER ENV " + $scope.masterEnv.url);
-                    $scope.masterEnv.config = masterResult.data[accessor];
-                    getSyncEnvsConfig(endPoint, accessor);
-                };
-            });
-        }
-        function getSyncEnvsConfig(endPoint, accessor) {
-            promises = []
-            $scope.syncEnvs.forEach(env => {
-                log("GETTING SYNC ENVIRONMENT DATA FOR " + env.url + " USING TOKEN " + env.token);
-                promises.push(retrieveDataService.getAllData(env.url, env.token, endPoint));
-            });
-            $q.all(promises).then(function (syncResults) {
-                if (syncResults != null) {
+                    $scope.masterEnv.config = masterResult[accessor];
                     $scope.syncEnvs.forEach(env => {
-                        var response = syncResults.filter(function (item) {
-                            return item.url.includes(env.url);
-                        })[0];
-                        env.config = response.data[accessor]
+                        getSyncEnvConfig(env, endPoint, accessor);
                     });
-                    getItemDetailsForMaster(endPoint);
-
                 };
             });
         }
-        function getItemDetailsForMaster(endPoint) {
-            promises = []
-            $scope.masterEnv.config.forEach(item => {
-                log("GETTING DETAILS FOR " + item.name + " IN " + $scope.masterEnv.url);
-                promises.push(retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint));
-            });
-            $q.all(promises).then(function (itemResults) {
-                if (itemResults != null) {
-                    $scope.masterEnv.config = itemResults;
+        function getSyncEnvConfig(env, endPoint, accessor) {
+            log("GETTING SYNC ENVIRONMENT DATA FOR " + env.url + " USING TOKEN " + env.token);
+            var syncEnvDataPromise = retrieveDataService.getAllData(env.url, env.token, endPoint, true);
+            $scope.currentRequests++;
+            syncEnvDataPromise.then(function (syncResult) {
+                $scope.currentRequests--;
+                if (syncResult != null) {
+                    log("SUCCESS GETING DETAILS FOR SYNC ENV " + env.url);
+                    var syncConfig = syncResult[accessor];;
                     if ($scope.type == 'add') {
-                        getItemDetailsForAdding(endPoint);
+                        var diff = compare($scope.masterEnv.config, syncConfig);
+                        diff.forEach(item => {
+                            getItemDetailsForAdding(item, endPoint, env);
+                        });
                     };
                     if ($scope.type == 'update') {
-                        getItemDetailsForUpdating(endPoint);
+                        $scope.masterEnv.config.forEach((item) => {
+                            var syncItemID = findItemID(item.name, syncConfig);
+                            if (syncItemID != null) {
+                                getItemDetailsForUpdating(item, syncItemID, endPoint, env);
+                            }
+                        });
                     };
                 };
             });
         }
-        function getItemDetailsForAdding(endPoint, env) {
-            var diff = [];
-            $scope.syncEnvs.forEach(env => {
-                comp = compare($scope.masterEnv.config, env.config, env.url, env.token);
-                diff = diff.concat(comp);
-
+        function getItemDetailsForAdding(item, endPoint, env) {
+            log("GETTING DETAILS FOR ADDING FOR " + item.name + " IN " + env.url);
+            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint, true);
+            $scope.currentRequests++;
+            itemDetailsDataPromise.then(function (itemResult) {
+                $scope.currentRequests--;
+                if (itemResult != null) {
+                    log("SUCCESS: " + itemResult.name);
+                    var itemConfig = itemResult;
+                    addItem(itemConfig, endPoint, env);
+                };
             });
-            addItems(diff, endPoint)
         }
-        function getItemDetailsForUpdating(endPoint) {
+        function getItemDetailsForUpdating(item, syncID, endPoint, env) {
+            log("GETTING DETAILS FOR UPDATING FOR " + item.name + " IN " + env.url);
+            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint, true);
+            $scope.currentRequests++;
+            itemDetailsDataPromise.then(function (itemResult) {
+                $scope.currentRequests--;
+                if (itemResult != null) {
+                    log("SUCCESS: " + itemResult.name);
+                    var itemConfig = itemResult;
+                    itemConfig.id = syncID;
+                    updateItem(itemConfig, endPoint, env);
 
-            items = []
-            $scope.masterEnv.config.forEach(details => {
-                $scope.syncEnvs.forEach(env => {
-                    var syncItem = findItem(details.name, env.config);
-                    if (syncItem != null) {
-                        newDetails = JSON.parse(JSON.stringify(details));
-                        newDetails.id = syncItem.id;
-                        newDetails.name = syncItem.name;
-                        items.push({ 'rule': newDetails, 'url': env.url, 'token': env.token });
-                    }
-                });
+                };
             });
-            updateItems(items, endPoint)
         }
-
-        function addItems(list, endPoint) {
-            promises = []
-            list.forEach(item => {
-                details = item.rule
-                log("CREATING RULE FOR " + details.name + " IN " + item.url);
-                details = item.rule
-                delete details.id;
-                if (details.rules != undefined) {
-                    details.rules.forEach(element => {
-                        delete element.id;
-                        if (element.methodRules != undefined) {
-                            element.methodRules.forEach(item => {
-                                delete item.id;
-                            });
-                        }
-                    });
+        function addItem(details, endPoint, env) {
+            log("CREATING RULE FOR " + details.name + " IN " + env.url);
+            delete details.id;
+            var postItemDataPromise = retrieveDataService.addItem(env.url, env.token, details, endPoint, true);
+            $scope.currentRequests++;
+            postItemDataPromise.then(function (addResult) {
+                $scope.currentRequests--;
+                if (addResult != null) {
+                    log("SUCCESS: " + details.name);
+                };
+            });
+        }
+        function updateItem(details, endPoint, env) {
+            log("UPDATING RULE");
+            log("BASE URL: " + env.url);
+            log("RULE NAME: " + details.name);
+            $scope.currentRequests++;
+            var postItemDataPromise = retrieveDataService.updateItem(env.url, env.token, details, endPoint, true);
+            postItemDataPromise.then(function (updateResult) {
+                $scope.currentRequests--;
+                if (updateResult != null) {
+                    log("SUCCESS: " + details.name);
                 }
-                promises.push(retrieveDataService.addItem(item.url, item.token, details, endPoint));
             });
-            if (promises.length == 0) {
-                $scope.runIsDisabled = false;
-            }
-            else {
-                $q.all(promises).then(function (addResults) {
-                    addResults.forEach(element => {
-                        log('id: ' + element.id + ' name: ' + element.name);
-                        $scope.runIsDisabled = false;
-                    });
-                });
-            }
         }
-        function updateItems(list, endPoint) {
-            promises = []
+        function findItemID(name, list) {
+            var id = null;
             list.forEach(item => {
-                details = item.rule
-                log("UPDATING RULE FOR " + details.name + " IN " + item.url);
-                promises.push(retrieveDataService.updateItem(item.url, item.token, details, endPoint));
-            });
-            if (promises.length == 0) {
-                $scope.runIsDisabled = false;
-            }
-            else {
-                $q.all(promises).then(function (addResults) {
-                    $scope.runIsDisabled = false;
-
-                });
-            }
-        }
-        function findItem(name, list) {
-            var id = '';
-            var responseName = '';
-            list.forEach(item => {
-                if (item.name.toLowerCase().replace(/ /g, '') == name.toLowerCase().replace(/ /g, '')) {
+                if (item.name.toLowerCase() == name.toLowerCase()) {
                     id = item.id;
-                    responseName = item.name;
                 }
             });
-
-            if (id != '') {
-                return { 'id': id, 'name': responseName };
-            }
-            return null
+            return id;
         }
-
-
-        function compare(listA, listB, url, token) {
+        function compare(listA, listB) {
             var diff = []
             listA.forEach(element => {
                 var isInList = false;
@@ -476,15 +614,17 @@
                     }
                 }
                 if (!isInList) {
-                    diff.push({ 'rule': element, 'url': url, 'token': token });
+                    diff.push(element);
                 }
             });
             return diff;
         }
         function log(message) {
+            $scope.hasUpdatedLog = true;
             $('#log').append('<p>' + message + '</p>');
         }
     });
+
     class Environment {
         constructor(url, token) {
             this.url = url;
