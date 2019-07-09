@@ -132,7 +132,7 @@
                     </div>
                     <div class="panel panel-default">
                         <div class="panel-body">
-                            <div class="alert alert-danger" ng-if="(!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
+                            <div class="alert alert-danger" ng-if="(!entryForm.customServicesEnabled.$valid ||!entryForm.requestAttributesEnabled.$valid || !entryForm.autoTaggingRulesEnabled.$valid || !entryForm.managementZonesRulesEnabled.$valid)  && hasSubmitted"
                                 ng-cloak>
                                 <div ng-message="required">Please select at least one of the following checkboxs</div>
                             </div>
@@ -156,6 +156,13 @@
                                 </label>
                                 <input ng-disabled="isbtnRunDisabled()" name="managementZonesRulesEnabled" ng-required="$scope.rulesType == null" type="radio"
                                     ng-model="rulesType" value="managementZone">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Custom Services
+                                </label>
+                                <input ng-disabled="isbtnRunDisabled()" name="customServicesEnabled" ng-required="$scope.rulesType == null" type="radio"
+                                    ng-model="rulesType" value="customServices">
                             </div>
                         </div>
                     </div>
@@ -181,6 +188,59 @@
             </form>
         </div>
         <!-- end Create Management Zones -->
+       <!-- Create Create Sythetic HTTP Montiors From Services -->
+
+        <div class="panel panel-primary">
+            <form name="entryFormHTTPMon">
+                <div class="panel panel-heading">
+                    <h1>Create Sythetic Montiors based on health  end-point</h1>
+                    <p>This will look at all the services and create a HTTP monitor if it fits the following criteria:</p>
+                    <p>
+                    <ul>
+                          <li>Health end-point specified has responded with a HTTP status code 200</li>
+                          <li>It is tagged with <b>HTTPMonitor</b></li>
+                    </ul>
+                    </p>
+                    <div class="alert alert-danger" ng-if='!entryFormDTEnv.$valid && hasSubmittedHTTPMon' ng-cloak>
+                        <div ng-message="required">You are missing some required fields</div>
+                    </div>
+                </div>
+                <div class="panel panel-body">
+                    <div class="form-group">
+                        <label>
+                            End-point
+                        </label>
+                        <div class="alert alert-danger" ng-if='!entryFormHTTPMon.endPointForHTTPMon.$valid && hasSubmittedHTTPMon' ng-cloak>
+                            <div ng-message="required">End-point is required</div>
+                        </div>
+                        <input ng-disabled="isbtnRunDisabled()" name="endPointForHTTPMon" ng-model="endPointForHTTPMon" placeholder="https://example.live.dynatrace.com"
+                            type="text" class="form-control" required></input>
+                    </div>
+                     <div class="form-group">
+                        <label>
+                            Location
+                        </label>
+                        <div class="alert alert-danger" ng-if='!entryFormHTTPMon.locationForHTTPMon.$valid && hasSubmittedHTTPMon' ng-cloak>
+                            <div ng-message="required">Location is required</div>
+                        </div>
+                        <input ng-disabled="isbtnRunDisabled()" name="locationForHTTPMon" ng-model="locationForHTTPMon" placeholder="QA"
+                            type="text" class="form-control" required></input>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            Port (leave blank if you want to use the default)
+                        </label>
+                        <input ng-disabled="isbtnRunDisabled()" name="portForHTTPMon" ng-model="portForHTTPMon" placeholder="433"
+                            type="text" class="form-control"></input>
+                    </div>
+                    <button type="button" ng-click="createSytheticHTTPMontiors()" ng-disabled="isbtnRunDisabled()" class="btn btn-primary" id="btnRun">Run</button>
+                </div>
+            </form>
+        </div>
+        <!-- end Create Sythetic HTTP Montiors from Services -->
+
+
+
 
         <div class="panel panel-default">
             <div class="panel panel-heading">
@@ -198,10 +258,25 @@
 <script>
     var app = angular.module('app', []);
     app.factory('retrieveDataService', function ($http, $q, $rootScope) {
-        var getAllData = function (url, token, endPoint, config) {
-            var fullURL = url + (config ? "/api/config/v1/" : "/api/v1/") + endPoint + "?Api-Token=" + token;
-            return $http({ method: "GET", url: fullURL }).then(function (result) {
-                return result.data;
+        var getAllData = function (url, token, endPoint, isConfig, mz = null) {
+            if (mz == null)
+            {
+            var fullURL = url + (isConfig ? "/api/config/v1/" : "/api/v1/") + endPoint + "?Api-Token=" + token;
+            }
+            else
+            {
+                var fullURL = url + (isConfig ? "/api/config/v1/" : "/api/v1/") + endPoint + "?Api-Token=" + token + "&tag=Environment:" + mz;
+            }
+            var req = {
+                method: 'GET',
+                url: fullURL,
+                headers: {
+                    'Access-Control-Allow-Origin':'*',
+                    'Access-Control-Allow-Credentials': 'true',
+                    }
+                };
+            return $http(req).then(function (result) {
+                return { 'data': result.data, 'url': result.config.url };
             },
                 function (data) {
                     if (data.status != 429) {
@@ -281,11 +356,36 @@
                     else {
                         log("HIT REQUEST LIMIT WAITING 60 SECONDS TO UPDATE ITEM " + details.name + " ON " + url);
                         return sleep(60000).then(function () {
-                            return updateItem(url, token, details, endPoint);
                         });
                     }
                 });
         };
+
+        var checkIfValidRequest = function (url, service)
+        {
+            var req = {
+                method: 'GET',
+                url: url,
+                headers: {
+                    'Access-Control-Allow-Origin':'https://s3.us-east-2.amazonaws.com',
+                    'Access-Control-Allow-Credentials': true,
+                    'Access-Control-Allow-Headers':true
+                    }
+                };
+            return $http(req).then(function (result) {
+                log("Response Code: " + result.status);
+                result.service = service;
+                return result;
+            },
+                function (data) {
+                    if (data.status != 200) {
+                        data.service = service;
+                        return data;
+                    }
+                });
+        }
+
+
         function log(message) {
             $('#log').append('<p>' + message + '</p>');
         }
@@ -303,17 +403,20 @@
 
             return deferred.promise;
         };
-        return { getAllData: getAllData, getDetailsData: getDetailsData, addItem: addItem, updateItem: updateItem };
+        return { getAllData: getAllData, getDetailsData: getDetailsData, addItem: addItem, updateItem: updateItem, checkIfValidRequest : checkIfValidRequest };
     });
-    app.controller('mainCtlr', function ($scope, retrieveDataService) {
+    app.controller('mainCtlr', function ($scope, retrieveDataService, $q) {
         $scope.runIsDisabled = false;
 
+
         $scope.masterEnv = new Environment(null, null);
-
-        $scope.syncEnvs = [
-
-            new Environment(null, null),
+	    $scope.syncEnvs = [
+	        new Environment(null, null)
         ];
+
+        $scope.endPointForHTTPMon = '/admin/health';
+        $scope.locationForHTTPMon =null;
+        $scope.portForHTTPMon = null;
 
         $scope.currentRequests = 0;
 
@@ -321,7 +424,10 @@
         $scope.rulesType = null
 
         $scope.hasSubmitted = false;
+
         $scope.hasSubmittedDTenv = false;
+
+        $scope.hasSubmittedHTTPMon = false;
         $scope.sowError = false;
 
         $scope.hasUpdatedLog = false;
@@ -354,6 +460,12 @@
                 if ($scope.rulesType == 'managementZone') {
                     syncRules("managementZones", "values");
                 }
+                if ($scope.rulesType == 'customServices') {
+                    syncRules("customServices/java", "values");
+                    //syncRules("customServices/dotNet", "values");
+                    //syncRules("customServices/php", "customServices");
+                    // syncRules("customServices/go", "customServices");
+                }
                 $scope.checkIfDone();
             }
         }
@@ -370,6 +482,78 @@
             }
         }
 
+        $scope.createSytheticHTTPMontiors = function () {
+            $scope.hasSubmittedHTTPMon = true;
+            $scope.hasSubmittedDTenv = true;
+            if ($scope.entryFormHTTPMon.$valid && $scope.entryFormDTEnv.$valid) {
+                $('#log').empty();
+                getServicesToCreateMonitors();
+                $scope.checkIfDone();
+            }
+        }
+
+        function getServicesToCreateMonitors() {
+            promises = []
+            promises.push(retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, "entity/services", false, $scope.locationForHTTPMon));
+            promises.push(retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, "synthetic/monitors", false));
+            promises.push(retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, "synthetic/locations", false));
+            $scope.currentRequests++
+            $q.all(promises).then(function (masterResult) {
+                $scope.currentRequests--;
+                if (masterResult != null) {
+                    services = [];
+                    montiors = masterResult[1]['data']['monitors'];
+                    locations = masterResult[2]['data']['locations'];
+                    if(locations != undefined)
+                    {
+                        searchedLocation  = locations.filter(x => x.name ===  $scope.locationForHTTPMon);
+                    }
+                    if(locations != undefined && searchedLocation.length > 0){
+                        searchedLocation = searchedLocation[0];
+
+                        masterResult[0]['data'].forEach( service =>
+                        {
+                            isTagFound = false;
+                            service.tags.forEach(tag =>
+                            {
+                                if(tag.key == "HTTPMonitor")
+                                {
+                                    isTagFound = true;
+                                    }
+                            })
+                            if(isTagFound)
+                            {
+                                 if(montiors.filter(obj => obj.name == service.displayName + " - Health Check").length < 1)
+                                 {
+                                     serv = {
+                                    'domain': service.webServerName,
+                                    'displayName': service.displayName};
+                                    if($scope.portForHTTPMon != null)
+                                    {
+                                        serv.domain = serv.domain.split(":")[0] + ":" + $scope.portForHTTPMon;
+                                    }
+                                    
+                                    services.push(serv);
+                                 }
+                                 else
+                                 {
+                                     log(service.displayName + " Already exists")
+                                 }
+                            }
+                        
+                    });
+                    //  checkIfValidRequest(services,searchedLocation);
+                    addHTTMon(services,searchedLocation);
+                    }
+                    else
+                    {
+                        log("Location not found");
+                    }
+                                                      
+            }
+            });
+        }
+
         function getMZandHGConfigurations() {
             $scope.masterEnv.manageZones = [ ]
             $scope.masterEnv.hostGroup = [ ]
@@ -384,6 +568,7 @@
                 if (masterResult != null) {
                     log("SUCCESS GETING MANAGEMENT ZONES DETAILS OF " + $scope.masterEnv.url);
                     $scope.masterEnv.config = masterResult["values"];
+                    
                     $scope.masterEnv.config.forEach(mz => {
                         if (!$scope.masterEnv.manageZones.includes(mz["name"])){
                             $scope.masterEnv.manageZones.push(mz["name"])
@@ -487,9 +672,88 @@
             } )
         }
                 
+         function checkIfValidRequest(services, httpLocation) {
+            promises = []
+            services.forEach(serv => {
+                // modify this section if you want to use different rules for your http mmonitor
+                promises.push(retrieveDataService.checkIfValidRequest("https://" + serv.domain +$scope.endPointForHTTPMon,serv));
+                
+            } );
+            $scope.currentRequests++
+            $q.all(promises).then(function (masterResult) {
+                $scope.currentRequests--;
+                if (masterResult != null) {
+                    masterResult.forEach(result =>{
+                        if(result.status == 404 || result.status == 502 || result.status == -1)
+                        {
+                            services = services.filter( x => x != result.service);
+                            log(result.service.domain + " Responded with a 404 or 502");
+                        };
+                    });
+                    addHTTMon(services,httpLocation);
+                }
+                });
+            
+         }    
+
+
+         function addHTTMon(services, httpLocation) {
+            promises = []
+            services.forEach(serv => {
+                log("CREATING HTTP MON FOR " + serv.domain + " IN " + $scope.masterEnv.url);
+                // modify this section if you want to use different rules for your http mmonitor
+                var details = {
+                    "frequencyMin": 5,
+                    "type": "HTTP",
+                    "name": serv.displayName+ " - Health Check",
+                    "locations": [httpLocation.entityId],
+                    "enabled": true,
+                    "script": {
+                        "version": "1.0",
+                        "requests": [
+                        {
+                            "description": serv.displayName + " - Health Check",
+                            "url": "https://" + serv.domain +$scope.endPointForHTTPMon ,
+                            "method": "GET",
+                            "requestBody": "",
+                            "configuration": {
+                                "acceptAnyCertificate": true,
+                                "followRedirects": true
+                                }
+                        }]
+                    },
+                    "anomalyDetection": {
+                        "outageHandling": {
+                            "globalOutage": false,
+                            "localOutage": true,
+                            "localOutagePolicy": {
+                                "affectedLocations": 1,
+                                "consecutiveRuns": 3
+                                }
+                        },
+                        "loadingTimeThresholds": {
+                            "enabled": false,
+                            "thresholds": [
+                            {
+                                "type": "TOTAL",
+                                "valueMs": 0
+                            }]
+                }
+            },
+                }
+                
+                promises.push(retrieveDataService.addItem($scope.masterEnv.url, $scope.masterEnv.token, details, "synthetic/monitors", false));
+            } );
+            $scope.currentRequests++
+            $q.all(promises).then(function (masterResult) {
+                $scope.currentRequests--;
+                if (masterResult != null) {
+
+                }
+                });
+         }       
         
-        
-        $scope.addSyncEnv = function () {
+         $scope.addSyncEnv = function () {
             $scope.syncEnvs.push(new Environment(null, null))
         }
         $scope.removeSyncEnv = function (index) {
@@ -504,107 +768,143 @@
         function getConfigurations(endPoint, accessor, isAdding) {
             log("GETTING MASTER ENVIRONMENT DATA " + $scope.masterEnv.url + " USING TOKEN " + $scope.masterEnv.token);
             var masterDataPromise = retrieveDataService.getAllData($scope.masterEnv.url, $scope.masterEnv.token, endPoint, true);
-            $scope.currentRequests++;
             masterDataPromise.then(function (masterResult) {
-                $scope.currentRequests--;
                 if (masterResult != null) {
                     log("SUCCESS GETING DETAILS FOR MASTER ENV " + $scope.masterEnv.url);
-                    $scope.masterEnv.config = masterResult[accessor];
+                    $scope.masterEnv.config = masterResult.data[accessor];
+                    getSyncEnvsConfig(endPoint, accessor);
+                };
+            });
+        }
+        function getSyncEnvsConfig(endPoint, accessor) {
+            promises = []
+            $scope.syncEnvs.forEach(env => {
+                log("GETTING SYNC ENVIRONMENT DATA FOR " + env.url + " USING TOKEN " + env.token);
+                promises.push(retrieveDataService.getAllData(env.url, env.token, endPoint,true));
+            });
+            $q.all(promises).then(function (syncResults) {
+                if (syncResults != null) {
                     $scope.syncEnvs.forEach(env => {
-                        getSyncEnvConfig(env, endPoint, accessor);
+                        var response = syncResults.filter(function (item) {
+                            return item.url.includes(env.url);
+                        })[0];
+                        env.config = response.data[accessor]
                     });
-                };
-            });
-        }
-        function getSyncEnvConfig(env, endPoint, accessor) {
-            log("GETTING SYNC ENVIRONMENT DATA FOR " + env.url + " USING TOKEN " + env.token);
-            var syncEnvDataPromise = retrieveDataService.getAllData(env.url, env.token, endPoint, true);
-            $scope.currentRequests++;
-            syncEnvDataPromise.then(function (syncResult) {
-                $scope.currentRequests--;
-                if (syncResult != null) {
-                    log("SUCCESS GETING DETAILS FOR SYNC ENV " + env.url);
-                    var syncConfig = syncResult[accessor];;
-                    if ($scope.type == 'add') {
-                        var diff = compare($scope.masterEnv.config, syncConfig);
-                        diff.forEach(item => {
-                            getItemDetailsForAdding(item, endPoint, env);
-                        });
-                    };
-                    if ($scope.type == 'update') {
-                        $scope.masterEnv.config.forEach((item) => {
-                            var syncItemID = findItemID(item.name, syncConfig);
-                            if (syncItemID != null) {
-                                getItemDetailsForUpdating(item, syncItemID, endPoint, env);
-                            }
-                        });
-                    };
-                };
-            });
-        }
-        function getItemDetailsForAdding(item, endPoint, env) {
-            log("GETTING DETAILS FOR ADDING FOR " + item.name + " IN " + env.url);
-            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint, true);
-            $scope.currentRequests++;
-            itemDetailsDataPromise.then(function (itemResult) {
-                $scope.currentRequests--;
-                if (itemResult != null) {
-                    log("SUCCESS: " + itemResult.name);
-                    var itemConfig = itemResult;
-                    addItem(itemConfig, endPoint, env);
-                };
-            });
-        }
-        function getItemDetailsForUpdating(item, syncID, endPoint, env) {
-            log("GETTING DETAILS FOR UPDATING FOR " + item.name + " IN " + env.url);
-            var itemDetailsDataPromise = retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint, true);
-            $scope.currentRequests++;
-            itemDetailsDataPromise.then(function (itemResult) {
-                $scope.currentRequests--;
-                if (itemResult != null) {
-                    log("SUCCESS: " + itemResult.name);
-                    var itemConfig = itemResult;
-                    itemConfig.id = syncID;
-                    updateItem(itemConfig, endPoint, env);
+                    getItemDetailsForMaster(endPoint);
 
                 };
             });
         }
-        function addItem(details, endPoint, env) {
-            log("CREATING RULE FOR " + details.name + " IN " + env.url);
-            delete details.id;
-            var postItemDataPromise = retrieveDataService.addItem(env.url, env.token, details, endPoint, true);
-            $scope.currentRequests++;
-            postItemDataPromise.then(function (addResult) {
-                $scope.currentRequests--;
-                if (addResult != null) {
-                    log("SUCCESS: " + details.name);
+        function getItemDetailsForMaster(endPoint) {
+            promises = []
+            $scope.masterEnv.config.forEach(item => {
+                log("GETTING DETAILS FOR " + item.name + " IN " + $scope.masterEnv.url);
+                promises.push(retrieveDataService.getDetailsData($scope.masterEnv.url, item.id, $scope.masterEnv.token, endPoint,true));
+            });
+            $q.all(promises).then(function (itemResults) {
+                if (itemResults != null) {
+                    $scope.masterEnv.config = itemResults;
+                    if ($scope.type == 'add') {
+                        getItemDetailsForAdding(endPoint);
+                    };
+                    if ($scope.type == 'update') {
+                        getItemDetailsForUpdating(endPoint);
+                    };
                 };
             });
         }
-        function updateItem(details, endPoint, env) {
-            log("UPDATING RULE");
-            log("BASE URL: " + env.url);
-            log("RULE NAME: " + details.name);
-            $scope.currentRequests++;
-            var postItemDataPromise = retrieveDataService.updateItem(env.url, env.token, details, endPoint, true);
-            postItemDataPromise.then(function (updateResult) {
-                $scope.currentRequests--;
-                if (updateResult != null) {
-                    log("SUCCESS: " + details.name);
-                }
+        function getItemDetailsForAdding(endPoint, env) {
+            var diff = [];
+            $scope.syncEnvs.forEach(env => {
+                comp = compare($scope.masterEnv.config, env.config, env.url, env.token);
+                diff = diff.concat(comp);
+
             });
+            addItems(diff, endPoint)
         }
-        function findItemID(name, list) {
-            var id = null;
+        function getItemDetailsForUpdating(endPoint) {
+
+            items = []
+            $scope.masterEnv.config.forEach(details => {
+                $scope.syncEnvs.forEach(env => {
+                    var syncItem = findItem(details.name, env.config);
+                    if (syncItem != null) {
+                        newDetails = JSON.parse(JSON.stringify(details));
+                        newDetails.id = syncItem.id;
+                        newDetails.name = syncItem.name;
+                        items.push({ 'rule': newDetails, 'url': env.url, 'token': env.token });
+                    }
+                });
+            });
+            updateItems(items, endPoint)
+        }
+
+        function addItems(list, endPoint) {
+            promises = []
             list.forEach(item => {
-                if (item.name.toLowerCase() == name.toLowerCase()) {
+                details = item.rule
+                log("CREATING RULE FOR " + details.name + " IN " + item.url);
+                details = item.rule
+                delete details.id;
+                if (details.rules != undefined) {
+                    details.rules.forEach(element => {
+                        delete element.id;
+                        if (element.methodRules != undefined) {
+                            element.methodRules.forEach(item => {
+                                delete item.id;
+                            });
+                        }
+                    });
+                }
+                promises.push(retrieveDataService.addItem(item.url, item.token, details, endPoint));
+            });
+            if (promises.length == 0) {
+                $scope.runIsDisabled = false;
+            }
+            else {
+                $q.all(promises).then(function (addResults) {
+                    addResults.forEach(element => {
+                        log('id: ' + element.id + ' name: ' + element.name);
+                        $scope.runIsDisabled = false;
+                    });
+                });
+            }
+        }
+        function updateItems(list, endPoint) {
+            promises = []
+            list.forEach(item => {
+                details = item.rule
+                log("UPDATING RULE FOR " + details.name + " IN " + item.url);
+                promises.push(retrieveDataService.updateItem(item.url, item.token, details, endPoint));
+            });
+            if (promises.length == 0) {
+                $scope.runIsDisabled = false;
+            }
+            else {
+                $q.all(promises).then(function (addResults) {
+                    $scope.runIsDisabled = false;
+
+                });
+            }
+        }
+        function findItem(name, list) {
+            var id = '';
+            var responseName = '';
+            list.forEach(item => {
+                if (item.name.toLowerCase().replace(/ /g, '') == name.toLowerCase().replace(/ /g, '')) {
                     id = item.id;
+                    responseName = item.name;
                 }
             });
-            return id;
+
+            if (id != '') {
+                return { 'id': id, 'name': responseName };
+            }
+            return null
         }
-        function compare(listA, listB) {
+
+
+        function compare(listA, listB, url, token) {
             var diff = []
             listA.forEach(element => {
                 var isInList = false;
@@ -614,17 +914,15 @@
                     }
                 }
                 if (!isInList) {
-                    diff.push(element);
+                    diff.push({ 'rule': element, 'url': url, 'token': token });
                 }
             });
             return diff;
         }
         function log(message) {
-            $scope.hasUpdatedLog = true;
             $('#log').append('<p>' + message + '</p>');
         }
     });
-
     class Environment {
         constructor(url, token) {
             this.url = url;
